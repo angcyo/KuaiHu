@@ -86,6 +86,8 @@ public class VideoListBean {
             private String mv_play_width;
             private String mv_title;
 
+            public VideoDetailBean videoDetailBean;
+
             public int getIs_cat_ads() {
                 return is_cat_ads;
             }

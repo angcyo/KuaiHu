@@ -1,5 +1,7 @@
 package com.angcyo.kuaihu
 
+import android.content.Context
+import android.graphics.Color
 import android.os.Bundle
 import android.support.v7.app.AppCompatActivity
 import com.angcyo.http.Http
@@ -10,9 +12,19 @@ import com.angcyo.kuaihu.http.HttpDNS
 import com.angcyo.kuaihu.http.PostFormBuilder
 import com.angcyo.kuaihu.http.bean.HttpBean
 import com.angcyo.kuaihu.http.bean.UserBean
+import com.angcyo.kuaihu.http.bean.VideoDetailBean
 import com.angcyo.kuaihu.http.bean.VideoListBean
-import com.angcyo.lib.L
+import com.angcyo.uiview.less.recycler.RBaseAdapter
+import com.angcyo.uiview.less.recycler.RBaseItemDecoration
+import com.angcyo.uiview.less.recycler.RBaseViewHolder
+import com.angcyo.uiview.less.recycler.RRecyclerView
+import com.angcyo.uiview.less.utils.RUtils
+import com.angcyo.uiview.less.utils.utilcode.utils.ClipboardUtils
+import com.angcyo.uiview.less.widget.rsen.RefreshLayout
+import com.angcyo.uiview.less.widget.rsen.RefreshLayout.BOTTOM
+import com.angcyo.uiview.less.widget.rsen.RefreshLayout.TOP
 import com.orhanobut.hawk.Hawk
+import rx.Observable
 import java.util.*
 import java.util.Arrays.asList
 
@@ -25,23 +37,53 @@ class MainActivity : AppCompatActivity() {
         var userBean: UserBean? = null
     }
 
+    var refreshLayout: RefreshLayout? = null
+    var recyclerView: RRecyclerView? = null
+    var adapter: MainActivity.Adapter = MainActivity.Adapter(this)
+
+    var page = 1
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
-        Http.create(Api::class.java)
-            .getHostIp("${HttpDNS.m_httpdns_url}${DOMAINLIST[0]}")
-            .compose(Http.transformerString())
-            .subscribe(object : HttpSubscriber<String>() {
-                override fun onSucceed(data: String?) {
-                    super.onSucceed(data)
-                    data?.let { it ->
-                        ip = it
+        refreshLayout = findViewById(R.id.refresh_layout)
+        recyclerView = findViewById(R.id.recycler_view)
+        recyclerView?.adapter = adapter
+        recyclerView?.addItemDecoration(
+            RBaseItemDecoration(
+                resources.getDimensionPixelOffset(R.dimen.base_mdpi),
+                Color.TRANSPARENT
+            )
+        )
 
-                        login()
+        refreshLayout?.let {
+            it.addOnRefreshListener { it ->
+                if (it == TOP) {
+                    if (userBean == null) {
+                        Http.create(Api::class.java)
+                            .getHostIp("${HttpDNS.m_httpdns_url}${DOMAINLIST[0]}")
+                            .compose(Http.transformerString())
+                            .subscribe(object : HttpSubscriber<String>() {
+                                override fun onSucceed(data: String?) {
+                                    super.onSucceed(data)
+                                    data?.let { it ->
+                                        ip = it
+
+                                        login()
+                                    }
+                                }
+                            })
+                    } else {
+                        getDomain(1)
                     }
+                } else if (it == BOTTOM) {
+                    getDomain(page + 1)
                 }
-            })
+            }
+            //it.setRefreshDirection(TOP)
+            it.setRefreshState(TOP)
+        }
     }
 
     override fun onResume() {
@@ -73,13 +115,13 @@ class MainActivity : AppCompatActivity() {
                         userBean = it
                     }
 
-                    getDomain()
+                    getDomain(page)
                 }
             })
     }
 
     /**获取domain, 用来获取ip*/
-    fun getDomain() {
+    fun getDomain(page: Int) {
         Http.create(Api::class.java)
             .getDomain(
                 Constant.HOST_HTTP + ip + Constant.HOST_PORT + Constant.API_DOMAIN,
@@ -99,22 +141,21 @@ class MainActivity : AppCompatActivity() {
                 override fun onSucceed(data: HttpBean?) {
                     super.onSucceed(data)
                     //{"code":0,"data":["api.kuaihuapi.com","api.khuapi.com"],"message":""}
-                    L.e("$data")
-                    getHotData()
+                    //L.e("$data")
+                    getHotData(page)
                 }
             })
     }
 
-
     /**视频列表*/
-    fun getHotData() {
+    fun getHotData(page: Int) {
         Http.create(Api::class.java)
             .post(
                 Constant.HOST_HTTP + ip + Constant.HOST_PORT + Constant.API_VIDEO_HOT,
                 PostFormBuilder().addParams(
                     "data",
                     AesEncryptionUtil.encrypt(
-                        Http.mapJson("page:1", "perPage:14", "uId:0"),
+                        Http.mapJson("page:$page", "perPage:0", "uId:0"),
                         Constant.AES_PWD,
                         Constant.AES_IV
                     )
@@ -123,14 +164,52 @@ class MainActivity : AppCompatActivity() {
             .compose(Http.transformerBean(VideoListBean::class.java) {
                 AesEncryptionUtil.decrypt(it, Constant.AES_PWD, Constant.AES_IV)
             })
-            .subscribe(object : HttpSubscriber<VideoListBean>() {
-                override fun onSucceed(data: VideoListBean?) {
+            .flatMap {
+                Observable.from(it.data.list)
+            }
+            .flatMap { listBean ->
+                Http.create(Api::class.java).post(
+                    Constant.HOST_HTTP + ip + Constant.HOST_PORT + Constant.API_VIDEO_DETAIL,
+                    PostFormBuilder().addParams(
+                        "data",
+                        AesEncryptionUtil.encrypt(
+                            Http.mapJson(
+                                "mvId:${listBean.mv_id}",
+                                "type:${Hawk.get("line", "2")}",
+                                "uId:${userBean?.data?.mu_id}"
+                            ),
+                            Constant.AES_PWD,
+                            Constant.AES_IV
+                        )
+                    ).buildParams()
+                ).compose(Http.transformerBean(VideoDetailBean::class.java) {
+                    AesEncryptionUtil.decrypt(it, Constant.AES_PWD, Constant.AES_IV)
+                }).onErrorResumeNext {
+                    it.printStackTrace()
+                    Observable.just(VideoDetailBean())
+                }.filter {
+                    it.data != null
+                }.flatMap {
+                    listBean.videoDetailBean = it
+                    Observable.just(listBean)
+                }
+            }
+            .toList()
+            .subscribe(object : HttpSubscriber<List<VideoListBean.DataBean.ListBean>>() {
+                override fun onSucceed(data: List<VideoListBean.DataBean.ListBean>?) {
                     super.onSucceed(data)
-                    //{"code":0,"data":["api.kuaihuapi.com","api.khuapi.com"],"message":""}
-//                    L.e("$data")
-                    //getHotData()
+                    this@MainActivity.page = page
+                    refreshLayout?.setRefreshEnd()
                     data?.let {
-                        getVideoDetail(it.data.list[0].mv_id)
+                        if (page <= 1) {
+                            adapter.resetData(it)
+                        } else {
+                            adapter.appendData(it)
+
+                            recyclerView?.let {
+                                it.smoothScrollBy(0, resources.getDimensionPixelOffset(R.dimen.base_xxxhdpi))
+                            }
+                        }
                     }
                 }
             })
@@ -160,4 +239,41 @@ class MainActivity : AppCompatActivity() {
             })
     }
 
+    class Adapter(context: Context) : RBaseAdapter<VideoListBean.DataBean.ListBean>(context) {
+        override fun getItemLayoutId(viewType: Int): Int {
+            return R.layout.item_video_layout
+        }
+
+        override fun onBindView(holder: RBaseViewHolder, position: Int, bean: VideoListBean.DataBean.ListBean?) {
+            bean?.let {
+                holder.giv(R.id.image_view).apply {
+                    reset()
+                    url = it.mv_img_url
+                }
+
+                holder.tv(R.id.title_view).text = "${bean.mv_title} - ${bean.mu_name}"
+                holder.tv(R.id.time_view).text = "${bean.videoDetailBean.data.mv_updated}"
+
+                holder.click(R.id.copy_button) {
+                    ClipboardUtils.copyText(bean.videoDetailBean.data.mv_play_url)
+
+                    Hawk.put("copy", "${Hawk.get("copy", "")},${bean.videoDetailBean.data.mv_play_url}")
+
+                    notifyItemChanged(position)
+                }
+
+                holder.click(R.id.download_button) {
+                    holder.clickView(R.id.copy_button)
+                    RUtils.startApp(mContext, "com.xunlei.downloadprovider")
+                }
+
+                if (Hawk.get("copy", "").contains(bean.videoDetailBean.data.mv_play_url)) {
+                    holder.tv(R.id.copy_button).text = "已复制"
+                } else {
+                    holder.tv(R.id.copy_button).text = "复制"
+                }
+            }
+        }
+
+    }
 }
