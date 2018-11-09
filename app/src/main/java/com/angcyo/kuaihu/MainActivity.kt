@@ -19,6 +19,7 @@ import com.angcyo.uiview.less.recycler.RBaseItemDecoration
 import com.angcyo.uiview.less.recycler.RBaseViewHolder
 import com.angcyo.uiview.less.recycler.RRecyclerView
 import com.angcyo.uiview.less.utils.RUtils
+import com.angcyo.uiview.less.utils.T_
 import com.angcyo.uiview.less.utils.utilcode.utils.ClipboardUtils
 import com.angcyo.uiview.less.widget.rsen.RefreshLayout
 import com.angcyo.uiview.less.widget.rsen.RefreshLayout.BOTTOM
@@ -65,12 +66,17 @@ class MainActivity : AppCompatActivity() {
                             .getHostIp("${HttpDNS.m_httpdns_url}${DOMAINLIST[0]}")
                             .compose(Http.transformerString())
                             .subscribe(object : HttpSubscriber<String>() {
-                                override fun onSucceed(data: String?) {
-                                    super.onSucceed(data)
+                                override fun onEnd(data: String?, error: Throwable?) {
+                                    super.onEnd(data, error)
                                     data?.let { it ->
                                         ip = it
 
                                         login()
+                                    }
+
+                                    error?.let {
+                                        T_.error(it.message)
+                                        refreshLayout?.setRefreshEnd()
                                     }
                                 }
                             })
@@ -138,11 +144,16 @@ class MainActivity : AppCompatActivity() {
                 AesEncryptionUtil.decrypt(it, Constant.AES_PWD, Constant.AES_IV)
             })
             .subscribe(object : HttpSubscriber<HttpBean>() {
-                override fun onSucceed(data: HttpBean?) {
-                    super.onSucceed(data)
+                override fun onEnd(data: HttpBean?, error: Throwable?) {
+                    super.onEnd(data, error)
                     //{"code":0,"data":["api.kuaihuapi.com","api.khuapi.com"],"message":""}
                     //L.e("$data")
                     getHotData(page)
+
+                    error?.let {
+                        T_.error(it.message)
+                        refreshLayout?.setRefreshEnd()
+                    }
                 }
             })
     }
@@ -196,8 +207,8 @@ class MainActivity : AppCompatActivity() {
             }
             .toList()
             .subscribe(object : HttpSubscriber<List<VideoListBean.DataBean.ListBean>>() {
-                override fun onSucceed(data: List<VideoListBean.DataBean.ListBean>?) {
-                    super.onSucceed(data)
+                override fun onEnd(data: List<VideoListBean.DataBean.ListBean>?, error: Throwable?) {
+                    super.onEnd(data, error)
                     this@MainActivity.page = page
                     refreshLayout?.setRefreshEnd()
                     data?.let {
@@ -210,6 +221,11 @@ class MainActivity : AppCompatActivity() {
                                 it.smoothScrollBy(0, resources.getDimensionPixelOffset(R.dimen.base_xxxhdpi))
                             }
                         }
+                    }
+
+                    error?.let {
+                        T_.error(it.message)
+                        refreshLayout?.setRefreshEnd()
                     }
                 }
             })
