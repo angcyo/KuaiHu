@@ -271,6 +271,8 @@ class MainActivity : AppCompatActivity() {
                 holder.tv(R.id.time_view).text = "${bean.videoDetailBean.data.mv_updated}"
 
                 holder.click(R.id.copy_button) {
+                    ClipboardUtils.copyText("clean")
+
                     ClipboardUtils.copyText(bean.videoDetailBean.data.mv_play_url)
 
                     Hawk.put("copy", "${Hawk.get("copy", "")},${bean.videoDetailBean.data.mv_play_url}")
