@@ -22,6 +22,6 @@ gradlew.bat
 *.log
 /RRealm
 
-http/
+/http/
 lib/
 uiviewless/
