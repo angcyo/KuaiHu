@@ -68,29 +68,16 @@ class MainActivity : AppCompatActivity() {
             it.addOnRefreshListener { it ->
                 if (it == TOP) {
                     if (userBean == null) {
-                        Http.create(Api::class.java)
-                            .getHostIp("${HttpDNS.m_httpdns_url}${DOMAINLIST[0]}")
-                            .compose(Http.transformerString())
-                            .subscribe(object : HttpSubscriber<String>() {
-                                override fun onEnd(data: String?, error: Throwable?) {
-                                    super.onEnd(data, error)
-                                    data?.let { it ->
-                                        ip = it
-
-                                        login()
-                                    }
-
-                                    error?.let {
-                                        T_.error(it.message)
-                                        refreshLayout?.setRefreshEnd()
-                                    }
-                                }
-                            })
+                        getHostIpAndLogin()
                     } else {
                         getDomain(1)
                     }
                 } else if (it == BOTTOM) {
-                    getDomain(page + 1)
+                    if (userBean == null) {
+                        getHostIpAndLogin()
+                    } else {
+                        getDomain(page + 1)
+                    }
                 }
             }
             //it.setRefreshDirection(TOP)
@@ -105,6 +92,27 @@ class MainActivity : AppCompatActivity() {
             }
 
         }
+    }
+
+    fun getHostIpAndLogin() {
+        Http.create(Api::class.java)
+            .getHostIp("${HttpDNS.m_httpdns_url}${DOMAINLIST[0]}")
+            .compose(Http.transformerString())
+            .subscribe(object : HttpSubscriber<String>() {
+                override fun onEnd(data: String?, error: Throwable?) {
+                    super.onEnd(data, error)
+                    data?.let { it ->
+                        ip = it
+
+                        login()
+                    }
+
+                    error?.let {
+                        T_.error(it.message)
+                        refreshLayout?.setRefreshEnd()
+                    }
+                }
+            })
     }
 
     override fun onResume() {
