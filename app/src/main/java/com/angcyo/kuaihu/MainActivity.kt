@@ -15,6 +15,7 @@ import com.angcyo.kuaihu.http.bean.HttpBean
 import com.angcyo.kuaihu.http.bean.UserBean
 import com.angcyo.kuaihu.http.bean.VideoDetailBean
 import com.angcyo.kuaihu.http.bean.VideoListBean
+import com.angcyo.uiview.less.base.BaseAppCompatActivity
 import com.angcyo.uiview.less.kotlin.fromJsonList
 import com.angcyo.uiview.less.kotlin.toJson
 import com.angcyo.uiview.less.recycler.RBaseAdapter
@@ -34,7 +35,7 @@ import java.util.*
 import java.util.Arrays.asList
 
 
-class MainActivity : AppCompatActivity() {
+class MainActivity : BaseAppCompatActivity() {
 
     companion object {
         var DOMAINLIST: ArrayList<String> = ArrayList(asList("api.kuaihuapi.com", "api.khuapi.com"))
@@ -92,6 +93,8 @@ class MainActivity : AppCompatActivity() {
             }
 
         }
+
+        checkPermissions()
     }
 
     fun getHostIpAndLogin() {
