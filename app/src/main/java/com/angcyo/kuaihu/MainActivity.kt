@@ -4,6 +4,7 @@ import android.content.Context
 import android.graphics.Color
 import android.os.Bundle
 import android.support.v7.app.AppCompatActivity
+import android.text.TextUtils
 import com.angcyo.http.Http
 import com.angcyo.http.HttpSubscriber
 import com.angcyo.kuaihu.http.AesEncryptionUtil
@@ -14,6 +15,8 @@ import com.angcyo.kuaihu.http.bean.HttpBean
 import com.angcyo.kuaihu.http.bean.UserBean
 import com.angcyo.kuaihu.http.bean.VideoDetailBean
 import com.angcyo.kuaihu.http.bean.VideoListBean
+import com.angcyo.uiview.less.kotlin.fromJsonList
+import com.angcyo.uiview.less.kotlin.toJson
 import com.angcyo.uiview.less.recycler.RBaseAdapter
 import com.angcyo.uiview.less.recycler.RBaseItemDecoration
 import com.angcyo.uiview.less.recycler.RBaseViewHolder
@@ -25,6 +28,7 @@ import com.angcyo.uiview.less.widget.rsen.RefreshLayout
 import com.angcyo.uiview.less.widget.rsen.RefreshLayout.BOTTOM
 import com.angcyo.uiview.less.widget.rsen.RefreshLayout.TOP
 import com.orhanobut.hawk.Hawk
+import kotlinx.android.synthetic.main.activity_main.*
 import rx.Observable
 import java.util.*
 import java.util.Arrays.asList
@@ -47,6 +51,8 @@ class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
+
+        setSupportActionBar(toolbar)
 
         refreshLayout = findViewById(R.id.refresh_layout)
         recyclerView = findViewById(R.id.recycler_view)
@@ -88,7 +94,16 @@ class MainActivity : AppCompatActivity() {
                 }
             }
             //it.setRefreshDirection(TOP)
-            it.setRefreshState(TOP)
+            //it.setRefreshState(TOP)
+
+            val allData = Hawk.get("all_data", "")
+            if (TextUtils.isEmpty(allData)) {
+                it.setRefreshState(TOP)
+            } else {
+                val list = allData.fromJsonList(VideoListBean.DataBean.ListBean::class.java)
+                adapter.resetData(list)
+            }
+
         }
     }
 
@@ -175,10 +190,10 @@ class MainActivity : AppCompatActivity() {
             .compose(Http.transformerBean(VideoListBean::class.java) {
                 AesEncryptionUtil.decrypt(it, Constant.AES_PWD, Constant.AES_IV)
             })
-            .flatMap {
+            .concatMap {
                 Observable.from(it.data.list)
             }
-            .flatMap { listBean ->
+            .concatMap { listBean ->
                 Http.create(Api::class.java).post(
                     Constant.HOST_HTTP + ip + Constant.HOST_PORT + Constant.API_VIDEO_DETAIL,
                     PostFormBuilder().addParams(
@@ -200,7 +215,7 @@ class MainActivity : AppCompatActivity() {
                     Observable.just(VideoDetailBean())
                 }.filter {
                     it.data != null
-                }.flatMap {
+                }.concatMap {
                     listBean.videoDetailBean = it
                     Observable.just(listBean)
                 }
@@ -221,6 +236,8 @@ class MainActivity : AppCompatActivity() {
                                 it.smoothScrollBy(0, resources.getDimensionPixelOffset(R.dimen.base_xxxhdpi))
                             }
                         }
+
+                        Hawk.put("all_data", adapter.allDatas.toJson())
                     }
 
                     error?.let {
