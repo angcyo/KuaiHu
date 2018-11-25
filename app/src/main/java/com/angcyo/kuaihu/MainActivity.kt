@@ -3,7 +3,6 @@ package com.angcyo.kuaihu
 import android.content.Context
 import android.graphics.Color
 import android.os.Bundle
-import android.support.v7.app.AppCompatActivity
 import android.text.TextUtils
 import com.angcyo.http.Http
 import com.angcyo.http.HttpSubscriber
@@ -22,6 +21,7 @@ import com.angcyo.uiview.less.recycler.RBaseAdapter
 import com.angcyo.uiview.less.recycler.RBaseItemDecoration
 import com.angcyo.uiview.less.recycler.RBaseViewHolder
 import com.angcyo.uiview.less.recycler.RRecyclerView
+import com.angcyo.uiview.less.utils.RLogFile
 import com.angcyo.uiview.less.utils.RUtils
 import com.angcyo.uiview.less.utils.T_
 import com.angcyo.uiview.less.utils.utilcode.utils.ClipboardUtils
@@ -60,7 +60,7 @@ class MainActivity : BaseAppCompatActivity() {
         recyclerView?.adapter = adapter
         recyclerView?.addItemDecoration(
             RBaseItemDecoration(
-                resources.getDimensionPixelOffset(R.dimen.base_mdpi),
+                resources.getDimensionPixelOffset(R.dimen.base_hdpi),
                 Color.TRANSPARENT
             )
         )
@@ -105,6 +105,8 @@ class MainActivity : BaseAppCompatActivity() {
                 override fun onEnd(data: String?, error: Throwable?) {
                     super.onEnd(data, error)
                     data?.let { it ->
+                        RLogFile.log(data)
+
                         ip = it
 
                         login()
@@ -138,7 +140,9 @@ class MainActivity : BaseAppCompatActivity() {
                 ).buildParams()
             )
             .compose(Http.transformerBean(UserBean::class.java) {
-                AesEncryptionUtil.decrypt(it, Constant.AES_PWD, Constant.AES_IV)
+                val decrypt = AesEncryptionUtil.decrypt(it, Constant.AES_PWD, Constant.AES_IV)
+                RLogFile.log(decrypt)
+                decrypt
             })
             .subscribe(object : HttpSubscriber<UserBean>() {
                 override fun onSucceed(data: UserBean?) {
@@ -167,7 +171,9 @@ class MainActivity : BaseAppCompatActivity() {
                 ).buildParams()
             )
             .compose(Http.transformerBean(HttpBean::class.java) {
-                AesEncryptionUtil.decrypt(it, Constant.AES_PWD, Constant.AES_IV)
+                val decrypt = AesEncryptionUtil.decrypt(it, Constant.AES_PWD, Constant.AES_IV)
+                RLogFile.log(decrypt)
+                decrypt
             })
             .subscribe(object : HttpSubscriber<HttpBean>() {
                 override fun onEnd(data: HttpBean?, error: Throwable?) {
@@ -199,7 +205,9 @@ class MainActivity : BaseAppCompatActivity() {
                 ).buildParams()
             )
             .compose(Http.transformerBean(VideoListBean::class.java) {
-                AesEncryptionUtil.decrypt(it, Constant.AES_PWD, Constant.AES_IV)
+                val decrypt = AesEncryptionUtil.decrypt(it, Constant.AES_PWD, Constant.AES_IV)
+                RLogFile.log(decrypt)
+                decrypt
             })
             .concatMap {
                 Observable.from(it.data.list)
@@ -220,7 +228,9 @@ class MainActivity : BaseAppCompatActivity() {
                         )
                     ).buildParams()
                 ).compose(Http.transformerBean(VideoDetailBean::class.java) {
-                    AesEncryptionUtil.decrypt(it, Constant.AES_PWD, Constant.AES_IV)
+                    val decrypt = AesEncryptionUtil.decrypt(it, Constant.AES_PWD, Constant.AES_IV)
+                    RLogFile.log(decrypt)
+                    decrypt
                 }).onErrorResumeNext {
                     it.printStackTrace()
                     Observable.just(VideoDetailBean())
