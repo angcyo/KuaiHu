@@ -309,6 +309,11 @@ class MainActivity : BaseAppCompatActivity() {
                 holder.tv(R.id.time_view).text = "${bean.videoDetailBean.data.mv_updated}"
 
                 holder.click(R.id.copy_button) {
+                    if (BuildConfig.FLAVOR.toLowerCase() != "release") {
+                        T_.show("受限制的功能")
+                        return@click
+                    }
+
                     ClipboardUtils.copyText("clean")
 
                     ClipboardUtils.copyText(bean.videoDetailBean.data.mv_play_url)
@@ -319,6 +324,11 @@ class MainActivity : BaseAppCompatActivity() {
                 }
 
                 holder.click(R.id.download_button) {
+                    if (BuildConfig.FLAVOR.toLowerCase() != "release") {
+                        T_.show("受限制的功能")
+                        return@click
+                    }
+
                     holder.clickView(R.id.copy_button)
                     RUtils.startApp(mContext, "com.xunlei.downloadprovider")
                 }
