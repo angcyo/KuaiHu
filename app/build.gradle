@@ -9,5 +9,5 @@ apply from:'../lib/key.gradle'
 dependencies {
     implementation fileTree(dir: 'libs', include: ['*.jar'])
 
-    implementation project(':uiviewless')
+    implementation project(':UIViewLess')
 }

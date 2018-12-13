@@ -1,1 +1,1 @@
-include ':app', ':lib', ':http', ':uiviewless'
+include ':app', ':lib', ':http', ':UIViewLess'

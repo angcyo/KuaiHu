@@ -17,18 +17,16 @@ import com.angcyo.kuaihu.http.bean.VideoListBean
 import com.angcyo.uiview.less.base.BaseAppCompatActivity
 import com.angcyo.uiview.less.kotlin.fromJsonList
 import com.angcyo.uiview.less.kotlin.toJson
-import com.angcyo.uiview.less.recycler.RBaseAdapter
 import com.angcyo.uiview.less.recycler.RBaseItemDecoration
 import com.angcyo.uiview.less.recycler.RBaseViewHolder
 import com.angcyo.uiview.less.recycler.RRecyclerView
+import com.angcyo.uiview.less.recycler.adapter.RBaseAdapter
 import com.angcyo.uiview.less.utils.RLogFile
 import com.angcyo.uiview.less.utils.RUtils
 import com.angcyo.uiview.less.utils.T_
 import com.angcyo.uiview.less.utils.utilcode.utils.ClipboardUtils
-import com.angcyo.uiview.less.widget.rsen.RefreshLayout
-import com.angcyo.uiview.less.widget.rsen.RefreshLayout.BOTTOM
-import com.angcyo.uiview.less.widget.rsen.RefreshLayout.TOP
 import com.orhanobut.hawk.Hawk
+import com.scwang.smartrefresh.layout.SmartRefreshLayout
 import kotlinx.android.synthetic.main.activity_main.*
 import rx.Observable
 import java.util.*
@@ -43,11 +41,15 @@ class MainActivity : BaseAppCompatActivity() {
         var userBean: UserBean? = null
     }
 
-    var refreshLayout: RefreshLayout? = null
+    var refreshLayout: SmartRefreshLayout? = null
     var recyclerView: RRecyclerView? = null
     var adapter: MainActivity.Adapter = MainActivity.Adapter(this)
 
     var page = 1
+
+    override fun enableLayoutFull(): Boolean {
+        return false
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -62,31 +64,31 @@ class MainActivity : BaseAppCompatActivity() {
             RBaseItemDecoration(
                 resources.getDimensionPixelOffset(R.dimen.base_hdpi),
                 Color.TRANSPARENT
-            )
+            ).apply {
+                setDrawLastHLine(true)
+            }
         )
 
         refreshLayout?.let {
-            it.addOnRefreshListener { it ->
-                if (it == TOP) {
-                    if (userBean == null) {
-                        getHostIpAndLogin()
-                    } else {
-                        getDomain(1)
-                    }
-                } else if (it == BOTTOM) {
-                    if (userBean == null) {
-                        getHostIpAndLogin()
-                    } else {
-                        getDomain(page + 1)
-                    }
+            it.setOnRefreshListener {
+                if (userBean == null) {
+                    getHostIpAndLogin()
+                } else {
+                    getDomain(1)
                 }
             }
-            //it.setRefreshDirection(TOP)
-            //it.setRefreshState(TOP)
+
+            it.setOnLoadMoreListener {
+                if (userBean == null) {
+                    getHostIpAndLogin()
+                } else {
+                    getDomain(page + 1)
+                }
+            }
 
             val allData = Hawk.get("all_data", "")
-            if (TextUtils.isEmpty(allData)) {
-                it.setRefreshState(TOP)
+            if (TextUtils.isEmpty(allData) || BuildConfig.DEBUG) {
+                it.autoRefresh()
             } else {
                 val list = allData.fromJsonList(VideoListBean.DataBean.ListBean::class.java)
                 adapter.resetData(list)
@@ -95,6 +97,8 @@ class MainActivity : BaseAppCompatActivity() {
         }
 
         checkPermissions()
+
+        title = "${getString(R.string.app_name)} ${RUtils.getAppVersionName()}"
     }
 
     fun getHostIpAndLogin() {
@@ -107,15 +111,12 @@ class MainActivity : BaseAppCompatActivity() {
                     data?.let { it ->
                         RLogFile.log(data)
 
-                        ip = it
+                        ip = it.split(";").first()
 
                         login()
                     }
 
-                    error?.let {
-                        T_.error(it.message)
-                        refreshLayout?.setRefreshEnd()
-                    }
+                    error(error)
                 }
             })
     }
@@ -123,6 +124,14 @@ class MainActivity : BaseAppCompatActivity() {
     override fun onResume() {
         super.onResume()
         //L.i(Json.to(Http.map("uid:123", "page:2")))
+    }
+
+    fun error(error: Throwable?) {
+        error?.let {
+            T_.error(it.message)
+            refreshLayout?.finishRefresh()
+            refreshLayout?.finishLoadMore()
+        }
     }
 
     /**登录接口*/
@@ -145,13 +154,16 @@ class MainActivity : BaseAppCompatActivity() {
                 decrypt
             })
             .subscribe(object : HttpSubscriber<UserBean>() {
-                override fun onSucceed(data: UserBean?) {
-                    super.onSucceed(data)
+
+                override fun onEnd(data: UserBean?, error: Throwable?) {
+                    super.onEnd(data, error)
+
                     data?.let {
                         userBean = it
+                        getDomain(page)
                     }
 
-                    getDomain(page)
+                    error(error)
                 }
             })
     }
@@ -182,10 +194,7 @@ class MainActivity : BaseAppCompatActivity() {
                     //L.e("$data")
                     getHotData(page)
 
-                    error?.let {
-                        T_.error(it.message)
-                        refreshLayout?.setRefreshEnd()
-                    }
+                    error(error)
                 }
             })
     }
@@ -246,25 +255,23 @@ class MainActivity : BaseAppCompatActivity() {
                 override fun onEnd(data: List<VideoListBean.DataBean.ListBean>?, error: Throwable?) {
                     super.onEnd(data, error)
                     this@MainActivity.page = page
-                    refreshLayout?.setRefreshEnd()
+                    refreshLayout?.finishRefresh()
+                    refreshLayout?.finishLoadMore()
                     data?.let {
                         if (page <= 1) {
                             adapter.resetData(it)
                         } else {
                             adapter.appendData(it)
 
-                            recyclerView?.let {
-                                it.smoothScrollBy(0, resources.getDimensionPixelOffset(R.dimen.base_xxxhdpi))
-                            }
+//                            recyclerView?.let {
+//                                it.smoothScrollBy(0, resources.getDimensionPixelOffset(R.dimen.base_xxxhdpi))
+//                            }
                         }
 
                         Hawk.put("all_data", adapter.allDatas.toJson())
                     }
 
-                    error?.let {
-                        T_.error(it.message)
-                        refreshLayout?.setRefreshEnd()
-                    }
+                    error(error)
                 }
             })
     }
@@ -300,13 +307,19 @@ class MainActivity : BaseAppCompatActivity() {
 
         override fun onBindView(holder: RBaseViewHolder, position: Int, bean: VideoListBean.DataBean.ListBean?) {
             bean?.let {
-                holder.giv(R.id.image_view).apply {
-                    reset()
-                    url = it.mv_img_url
+                if (!BuildConfig.DEBUG) {
+                    holder.giv(R.id.image_view).apply {
+                        reset()
+                        url = it.mv_img_url
+                    }
                 }
 
                 holder.tv(R.id.title_view).text = "${bean.mv_title} - ${bean.mu_name}"
                 holder.tv(R.id.time_view).text = "${bean.videoDetailBean.data.mv_updated}"
+
+                holder.clickItem {
+                    holder.clickView(R.id.copy_button)
+                }
 
                 holder.click(R.id.copy_button) {
                     if (BuildConfig.FLAVOR.toLowerCase() != "release") {
