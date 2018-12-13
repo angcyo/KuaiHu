@@ -322,7 +322,7 @@ class MainActivity : BaseAppCompatActivity() {
                 }
 
                 holder.click(R.id.copy_button) {
-                    if (BuildConfig.FLAVOR.toLowerCase() != "release") {
+                    if (BuildConfig.FLAVOR.toLowerCase() != "apk") {
                         T_.show("受限制的功能")
                         return@click
                     }
