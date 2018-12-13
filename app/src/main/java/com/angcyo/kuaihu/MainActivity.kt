@@ -305,6 +305,14 @@ class MainActivity : BaseAppCompatActivity() {
             return R.layout.item_video_layout
         }
 
+        private fun isLimit(): Boolean {
+            if (BuildConfig.FLAVOR.toLowerCase() != "apk") {
+                T_.show("受限制的功能${BuildConfig.FLAVOR.toLowerCase()}")
+                return true
+            }
+            return false
+        }
+
         override fun onBindView(holder: RBaseViewHolder, position: Int, bean: VideoListBean.DataBean.ListBean?) {
             bean?.let {
                 if (!BuildConfig.DEBUG) {
@@ -322,8 +330,7 @@ class MainActivity : BaseAppCompatActivity() {
                 }
 
                 holder.click(R.id.copy_button) {
-                    if (BuildConfig.FLAVOR.toLowerCase() != "apk") {
-                        T_.show("受限制的功能")
+                    if (isLimit()) {
                         return@click
                     }
 
@@ -337,8 +344,7 @@ class MainActivity : BaseAppCompatActivity() {
                 }
 
                 holder.click(R.id.download_button) {
-                    if (BuildConfig.FLAVOR.toLowerCase() != "release") {
-                        T_.show("受限制的功能")
+                    if (isLimit()) {
                         return@click
                     }
 
@@ -355,4 +361,6 @@ class MainActivity : BaseAppCompatActivity() {
         }
 
     }
+
+
 }
